@@ -1,0 +1,10 @@
+# Built binary
+/proj3
+
+# Sbatch run logs (the directory itself is tracked via .gitkeep)
+benchmark/slurm/out/*.out
+benchmark/slurm/out/*.err
+
+# Python bytecode cache
+__pycache__/
+*.pyc

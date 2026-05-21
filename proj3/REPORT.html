@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Project 3 - Parallel Monte Carlo Option Pricer</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Project 3 - Parallel Monte Carlo Option Pricer</h1>
+</header>
+<h1 id="project-3-parallel-monte-carlo-option-pricer">Project 3 —
+Parallel Monte Carlo Option Pricer</h1>
+<p>Enrico Pioppi CMSC 22360 — Parallel Programming</p>
+<hr />
+<h2 id="problem">1. Problem</h2>
+<p>The project prices a <strong>portfolio of options</strong> by Monte
+Carlo. For each option in the input portfolio, the system simulates many
+sample paths of the underlying asset under geometric Brownian motion,
+evaluates the option’s payoff on each path, averages the payoffs, and
+discounts back to present value. The portfolio total is the sum across
+all options.</p>
+<p>Three option types are supported:</p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 32%" />
+<col style="width: 47%" />
+</colgroup>
+<thead>
+<tr>
+<th>Option type</th>
+<th>Payoff</th>
+<th>Per-path work</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>European call</td>
+<td><code>max(S_T - K, 0)</code></td>
+<td>One normal draw (sample <code>S_T</code> directly under GBM)</td>
+</tr>
+<tr>
+<td>Asian (arith-avg) call</td>
+<td><code>max(mean(S_t) - K, 0)</code></td>
+<td>Step through the full path (M timesteps)</td>
+</tr>
+<tr>
+<td>American put</td>
+<td><code>max(K - S_t*, 0)</code> at optimal <code>t*</code></td>
+<td>Step through the full path + least-squares regression</td>
+</tr>
+</tbody>
+</table>
+<p>The three types differ by roughly <strong>two orders of magnitude in
+per-option work</strong>: European pricing is one normal draw per path;
+Asian needs a path of M≈100 steps; American needs a path <em>plus</em> a
+backward induction with a regression at every in-the-money node. This
+wide cost spread is the reason work-stealing matters for this problem: a
+portfolio with a mix of types is the “items of vastly different sizes”
+case the assignment brief calls out.</p>
+<p>The system reads a portfolio (JSON), prices each option via Monte
+Carlo, and writes timing rows to a CSV. Three execution modes are
+selectable via a CLI flag.</p>
+<h2 id="how-the-parallel-solutions-are-implemented">2. How the parallel
+solutions are implemented</h2>
+<h3 id="why-map-reduce">2.1 Why map-reduce</h3>
+<p>Pricing one option is independent of every other option. There are no
+inter-option dependencies, no streaming pipeline stages, and no need for
+multiple rounds of synchronization. <strong>Map-reduce</strong> with a
+single barrier between map and reduce is the simplest pattern that
+fits:</p>
+<ul>
+<li><strong>Map:</strong> apply the pricer to each option independently
+and write the result into a pre-allocated slice.</li>
+<li><strong>Barrier</strong> (sync.Cond): every map task finishes before
+the reduce starts.</li>
+<li><strong>Reduce:</strong> sum the per-option prices.</li>
+</ul>
+<p>BSP and pipelining would force structure where the problem doesn’t
+need any. Map-reduce keeps the implementation small and lets the reduce
+step (200 floating-point additions) stay trivial.</p>
+<p><strong>Latency vs throughput.</strong> The two parallel runners
+optimise for different things. Map-reduce has effectively zero per-task
+overhead (workers run a tight loop over their slice) but pays one global
+barrier wake-up at the end, so it maximises <em>throughput</em> on a
+balanced workload where every worker finishes at roughly the same time.
+The moment workloads diverge, however, map-reduce’s wall-clock latency
+is gated by the <em>slowest</em> worker — the barrier won’t release
+until that worker is done. Work-stealing inverts the trade-off: each
+task pop costs a pair of atomic operations, but no worker is ever stuck
+idle while another has unfinished work. So work-stealing trades a small
+constant per-task cost for a much lower tail latency on uneven
+workloads, which is exactly the regime this portfolio lives in.</p>
+<h3 id="sequential-baseline-runnersequential.go">2.2 Sequential baseline
+(<code>runner/sequential.go</code>)</h3>
+<p>One goroutine loops over the portfolio and calls the type-dispatched
+pricer for each option. This is the reference: the parallel runners must
+produce the same per-option prices (and therefore the same portfolio
+total) when given the same seed.</p>
+<h3
+id="basic-parallel-static-partition-map-reduce-runnermapreduce.go">2.3
+Basic parallel: static-partition map-reduce
+(<code>runner/mapreduce.go</code>)</h3>
+<p><code>T</code> worker goroutines each receive a contiguous slice of
+the options array of size <code>⌈n/T⌉</code>. Each worker prices its
+slice and writes results into disjoint indices of the shared results
+slice — no contention, no locks. Every worker, plus the main goroutine,
+then calls <code>Barrier.Wait()</code> (T+1 participants). When the
+barrier opens, the main goroutine performs the reduce.</p>
+<p>The barrier is implemented in <code>barrier/barrier.go</code> as
+<code>sync.Mutex</code> + <code>sync.Cond</code> with a generation
+counter for reuse, following the condition-variable barrier pattern from
+class. (I could have used <code>sync.WaitGroup</code> for the same
+effect, but the assignment specifically asks for a
+<code>sync.Cond</code> barrier here.)</p>
+<p>The static partition is deliberately simple — and that simplicity is
+what motivates the work-stealing runner. With the unbalanced portfolio
+(Europeans grouped first, then Asians, then Americans), the last
+worker(s) get the heavy options while the first finish their cheap
+Europeans in milliseconds and wait at the barrier.</p>
+<h3 id="work-stealing-runnersteal.go-dequedeque.go">2.4 Work-stealing
+(<code>runner/steal.go</code> + <code>deque/deque.go</code>)</h3>
+<p>Each of the <code>T</code> worker goroutines owns its own
+<strong>Chase-Lev lock-free deque</strong>. Tasks are distributed
+round-robin at startup so that heavy options are spread across all
+deques rather than all landing on the last one. Each worker loops:</p>
+<ol type="1">
+<li>Try to pop a task from its <strong>own deque’s bottom</strong>
+(LIFO).</li>
+<li>If empty, pick a random victim and try to steal from the
+<strong>top</strong> of that victim’s deque (FIFO).</li>
+<li>If the global <code>remaining</code> counter hits zero, exit.</li>
+<li>Otherwise yield (<code>runtime.Gosched()</code>) and retry.</li>
+</ol>
+<p>The deque is <strong>lock-free</strong> (the assignment’s main
+requirement for this part): all synchronization is done with
+<code>sync/atomic</code> operations on <code>top</code> and
+<code>bottom</code>, no mutex anywhere. The owner’s
+<code>PushBottom</code> and the uncontended branch of
+<code>PopBottom</code> need only atomic loads/stores. Only the
+one-element edge case — where the owner and a thief race for the last
+item — needs a <code>CompareAndSwap</code> on <code>top</code>.</p>
+<p>Per-option task granularity (one task = one option) is chosen because
+the variance in cost between option types is already large enough that
+finer subdivision (per-path chunks) wouldn’t help much in practice for
+this portfolio. Per-path chunks are mentioned in §10 as the natural next
+step if the portfolio had fewer but more expensive options.</p>
+<h3 id="per-task-rng-determinism-optionrng.go">2.5 Per-task RNG
+determinism (<code>option/rng.go</code>)</h3>
+<p>Each task constructs its own <code>XorShift64</code> PRNG seeded from
+<code>seed XOR (taskIndex+1) · 0x9E3779B97F4A7C15</code>. There is no
+shared RNG state, so threads never have to coordinate on the RNG. The
+same global seed produces the same per-option prices regardless of mode
+or thread count, which makes correctness comparisons across runners
+trivial.</p>
+<h2 id="challenges">3. Challenges</h2>
+<p><strong>What I wanted to learn.</strong> Going in, I wanted to find
+out two things: (a) whether work-stealing’s textbook advantage actually
+shows up in wall-clock numbers when per-task cost varies by ~100× — or
+whether constant overheads eat the win at small portfolio sizes; and (b)
+what it actually takes to implement a lock-free deque correctly from the
+paper, rather than reaching for a library. Both questions ended up
+answered (yes, and “more than I expected”) and shape the discussion
+below.</p>
+<p><strong>Chase-Lev correctness.</strong> Getting the one-element edge
+case right took some thought. When the deque holds exactly one task, the
+owner’s <code>PopBottom</code> and a thief’s <code>Steal</code> both
+target the same slot; the algorithm settles the race with a
+<code>CompareAndSwap</code> on <code>top</code>. Go’s
+<code>sync/atomic</code> provides sequentially-consistent semantics, so
+I didn’t need to add explicit memory fences. The deque has a
+<code>-race</code>-clean stress test that runs one owner against
+multiple thieves over 50,000 tasks.</p>
+<p><strong>Deterministic prices across runners.</strong> Per-task RNG
+seeding (rather than a shared global RNG) was the cleanest way to make
+seq / par / steal produce identical numbers. A shared RNG would have
+either needed locking (killing scalability) or made prices depend on
+thread count (defeating correctness checks).</p>
+<p><strong>Dataset layout.</strong> A sorted layout (Europeans → Asians
+→ Americans) produces a clear gap between static partitioning and
+work-stealing for the writeup; a shuffled portfolio would still show
+work-stealing winning, just by a smaller margin. I went with sorted for
+the demonstration.</p>
+<p><strong>Termination detection.</strong> A general work-stealing
+termination protocol is tricky (a worker can be “idle” while a victim is
+about to push more work). Because the runner here only pushes during
+init, I could simplify termination to an atomic <code>remaining</code>
+counter that hits zero exactly when all tasks have been processed.</p>
+<h2 id="correctness-check">4. Correctness check</h2>
+<p>All three runners agree on every portfolio total, byte for byte. Two
+representative seeds:</p>
+<pre><code>seed=42
+mode=seq   threads=1  dataset=balanced    elapsed=162ms   total=2843.7070
+mode=par   threads=8  dataset=balanced    elapsed=27ms    total=2843.7070
+mode=steal threads=8  dataset=balanced    elapsed=23ms    total=2843.7070
+mode=seq   threads=1  dataset=unbalanced  elapsed=4021ms  total=2597.5307
+mode=par   threads=8  dataset=unbalanced  elapsed=1796ms  total=2597.5307
+mode=steal threads=8  dataset=unbalanced  elapsed=485ms   total=2597.5307
+
+seed=100
+mode=seq   threads=1  dataset=balanced    elapsed=157ms   total=2841.1003
+mode=par   threads=8  dataset=balanced    elapsed=42ms    total=2841.1003
+mode=steal threads=8  dataset=balanced    elapsed=24ms    total=2841.1003
+mode=seq   threads=1  dataset=unbalanced  elapsed=4117ms  total=2595.0268
+mode=par   threads=8  dataset=unbalanced  elapsed=1925ms  total=2595.0268
+mode=steal threads=8  dataset=unbalanced  elapsed=469ms   total=2595.0268</code></pre>
+<p>The same byte-for-byte agreement holds for every cell in the full
+5-seed sweep — portfolio totals reproduce across thread counts, modes,
+and machines because of the per-task RNG seeding scheme (§2.5).</p>
+<p>A separate Go test (<code>option/european_test.go</code>) prices an
+at-the-money European call by Monte Carlo and asserts the result lies
+within 3 standard errors of the Black-Scholes closed form — a 99.7%
+confidence check on the pricer itself.</p>
+<p>As an extra sanity check, the European Monte Carlo pricer was
+compared to the Black-Scholes closed form for a simple case
+(<code>spot=100, K=100, r=0.05, sigma=0.2, T=1</code>): the pricer
+returns about 10.39, vs the analytical value 10.45 — within about 1.2
+standard errors of the MC estimate.</p>
+<h2 id="experimental-results">5. Experimental results</h2>
+<p>All experiments use 200-option portfolios.</p>
+<ul>
+<li><strong>Balanced</strong>: 200 European calls. Per-option cost is
+roughly uniform.</li>
+<li><strong>Unbalanced</strong>: 140 European + 40 Asian + 20 American,
+grouped in that order. The 30% non-European options account for almost
+all the compute.</li>
+</ul>
+<p>Numbers below are from the <strong><code>fe.ai.cs.uchicago.edu</code>
+Peanut cluster</strong>, <code>peanut-cpu</code> partition (AMD EPYC
+9124, 16 physical cores allocated per job, Go 1.19.13 installed in
+<code>$HOME/go</code> per the project’s cluster notes, Linux). The job
+is submitted as <code>sbatch benchmark/benchmark-proj3.sh</code>, which
+sets up the environment and invokes
+<code>scripts/cluster_experiments.sh</code> to sweep five RNG seeds (42,
+100, 7, 1234, 9999). Every table cell below is the mean of those five
+runs.</p>
+<p>Cross-seed dispersion is tight on the unbalanced workload (median
+coefficient of variation 3.3%, max 5.8%) and looser on the balanced
+workload (median 6.7%, max 19.5%) — the latter because individual
+balanced runs at high <code>T</code> finish in 20–40 ms, where OS
+scheduling jitter is a meaningful fraction of wall-clock time. None of
+the qualitative comparisons below change if a worst-case run replaces
+the mean.</p>
+<h3 id="sequential-runtime">5.1 Sequential runtime</h3>
+<table>
+<thead>
+<tr>
+<th>Dataset</th>
+<th>Time (s)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>balanced</td>
+<td>0.16</td>
+</tr>
+<tr>
+<td>unbalanced</td>
+<td>4.01</td>
+</tr>
+</tbody>
+</table>
+<p>The 25× gap confirms that “unbalanced” really does concentrate the
+work.</p>
+<figure>
+<img src="plots/runtime_seq.png"
+alt="Sequential runtime: balanced vs unbalanced" />
+<figcaption aria-hidden="true">Sequential runtime: balanced vs
+unbalanced</figcaption>
+</figure>
+<h3 id="speedup-balanced-portfolio">5.2 Speedup, balanced portfolio</h3>
+<table>
+<thead>
+<tr>
+<th>Threads</th>
+<th style="text-align: right;">Map-reduce</th>
+<th style="text-align: right;">Work-stealing</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2</td>
+<td style="text-align: right;">1.58</td>
+<td style="text-align: right;">1.76</td>
+</tr>
+<tr>
+<td>4</td>
+<td style="text-align: right;">2.48</td>
+<td style="text-align: right;">3.30</td>
+</tr>
+<tr>
+<td>6</td>
+<td style="text-align: right;">3.27</td>
+<td style="text-align: right;">5.34</td>
+</tr>
+<tr>
+<td>8</td>
+<td style="text-align: right;">4.76</td>
+<td style="text-align: right;">6.52</td>
+</tr>
+<tr>
+<td>12</td>
+<td style="text-align: right;">6.85</td>
+<td style="text-align: right;">8.03</td>
+</tr>
+</tbody>
+</table>
+<p>Both modes scale on the balanced portfolio, with work-stealing
+consistently a step ahead. The gap (e.g. 4.76× vs 6.52× at T=8) is small
+in absolute terms — the balanced runs finish in 25–40 ms total, so the
+barrier wake-up cost on the map-reduce side is a non-trivial fraction of
+that tiny budget. Work-stealing has no global barrier: each worker exits
+as soon as the atomic <code>remaining</code> counter hits zero, which on
+a balanced workload happens at roughly the same moment for everyone.
+Once the absolute runtime grows (the unbalanced case in §5.3), this
+constant-overhead gap stops mattering and the load-balancing advantage
+takes over.</p>
+<figure>
+<img src="plots/speedup_balanced.png"
+alt="Speedup, balanced portfolio" />
+<figcaption aria-hidden="true">Speedup, balanced portfolio</figcaption>
+</figure>
+<h3 id="speedup-unbalanced-portfolio">5.3 Speedup, unbalanced
+portfolio</h3>
+<table>
+<thead>
+<tr>
+<th>Threads</th>
+<th style="text-align: right;">Map-reduce</th>
+<th style="text-align: right;">Work-stealing</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">2.11</td>
+</tr>
+<tr>
+<td>4</td>
+<td style="text-align: right;">1.22</td>
+<td style="text-align: right;">4.34</td>
+</tr>
+<tr>
+<td>6</td>
+<td style="text-align: right;">1.93</td>
+<td style="text-align: right;">6.51</td>
+</tr>
+<tr>
+<td>8</td>
+<td style="text-align: right;">2.18</td>
+<td style="text-align: right;">8.18</td>
+</tr>
+<tr>
+<td>12</td>
+<td style="text-align: right;">3.27</td>
+<td style="text-align: right;">9.53</td>
+</tr>
+</tbody>
+</table>
+<p>On the unbalanced portfolio, the two modes diverge sharply. At
+<strong>T=2</strong> the static partition gets almost no speedup
+(1.05×): the second worker inherits the entire Asian + American workload
+while the first finishes its slice of cheap Europeans in milliseconds
+and waits at the barrier. Work-stealing at T=2 gets 2.13× — slightly
+<strong>super-linear</strong> vs the single-thread baseline because the
+two workers cooperatively price the expensive options sooner, hiding
+some of the per-call allocation pressure that the lone sequential worker
+pays back-to-back.</p>
+<p>At T=8 the gap is <strong>2.18× vs 8.18×</strong> — work-stealing is
+about <strong>3.8× faster wall-clock</strong> than static partitioning.
+At T=12 the gap widens to 3.27× vs 9.53×: work-stealing continues to
+scale past the 8-physical-core boundary thanks to SMT, while static
+partitioning’s gain comes mainly from the heaviest workers each owning
+fewer expensive options as T grows (and is still bottlenecked by
+whichever worker drew the Americans).</p>
+<figure>
+<img src="plots/speedup_unbalanced.png"
+alt="Speedup, unbalanced portfolio" />
+<figcaption aria-hidden="true">Speedup, unbalanced
+portfolio</figcaption>
+</figure>
+<figure>
+<img src="plots/unbalanced_t8.png" alt="Elapsed at T=8, unbalanced" />
+<figcaption aria-hidden="true">Elapsed at T=8, unbalanced</figcaption>
+</figure>
+<h3 id="per-implementation-speedup">5.4 Per-implementation speedup</h3>
+<p>The plots above overlay both implementations on a single chart so the
+two are easy to compare side-by-side. The plots below isolate one
+implementation per chart so each parallel implementation has its own
+explicit speedup graph (with the two datasets overlaid).</p>
+<figure>
+<img src="plots/speedup_par.png"
+alt="Speedup - map-reduce, both datasets" />
+<figcaption aria-hidden="true">Speedup - map-reduce, both
+datasets</figcaption>
+</figure>
+<figure>
+<img src="plots/speedup_steal.png"
+alt="Speedup - work-stealing, both datasets" />
+<figcaption aria-hidden="true">Speedup - work-stealing, both
+datasets</figcaption>
+</figure>
+<h2 id="hotspots-and-bottlenecks">6. Hotspots and bottlenecks</h2>
+<p><strong>Hotspots (parallelizable):</strong></p>
+<ul>
+<li>Asian pricer inner loop — per-path step-by-step path simulation, O(P
+· M) for P paths and M timesteps. Trivially parallel across
+options.</li>
+<li>American pricer — forward path generation plus a backward induction
+with a least-squares regression at each in-the-money node. Heaviest
+per-option workload by a wide margin. Parallel across options.</li>
+</ul>
+<p><strong>Bottlenecks (irreducibly sequential):</strong></p>
+<ul>
+<li>JSON portfolio load at startup (a few ms; negligible).</li>
+<li>The final reduce — 200 float adds, sub-millisecond.</li>
+<li>The path simulation inside any single option is sequential because
+the GBM step at time <code>t</code> depends on the price at time
+<code>t-1</code>. With 60 medium/heavy options spread across 12 threads,
+there’s still plenty of parallelism overall, but a portfolio with only a
+handful of very heavy options would expose this as a real limit.
+Per-path subdivision (§10) is the natural next step there.</li>
+</ul>
+<p>The system parallelizes the hotspots fully — no contended shared
+state or lock sits in the inner loop. The remaining bottleneck on the
+unbalanced portfolio is <strong>load imbalance between threads</strong>,
+which is exactly the problem work-stealing addresses (§7).</p>
+<p>A few small optimizations matter for this workload:</p>
+<ul>
+<li><strong>American pricer:</strong> a single flat
+<code>[]float64</code> buffer is used for all paths instead of
+<code>[][]float64</code>, cutting per-call allocations from O(P) to O(1)
+and reducing GC pressure when several American pricers run on different
+goroutines.</li>
+<li><strong>American pricer:</strong> the per-timestep discount factors
+are precomputed once into a small array, replacing the inner-loop
+<code>math.Pow</code> calls with array lookups.</li>
+<li><strong>Chase-Lev deque cache padding:</strong> the <code>top</code>
+and <code>bottom</code> atomics sit on separate 64-byte cache lines
+(<code>deque/deque.go</code>). Without that padding the two atomics
+share a line, and every <code>Steal()</code> invalidates the line on the
+owner’s core. An A/B comparison on the cluster (one cluster run with the
+padding removed, one with it back in, same Go version and CPU
+allocation) showed the padding shaving about 4% off the unbalanced T=8
+work-stealing run, at zero cost in code size.</li>
+</ul>
+<h2 id="did-work-stealing-improve-performance-why">7. Did work-stealing
+improve performance? Why?</h2>
+<p>Yes, by a lot on the unbalanced portfolio. At T=8 the work-stealing
+runner is <strong>3.8× faster</strong> than the static-partition runner
+(490 ms vs 1836 ms), and at T=2 it’s about <strong>2× faster</strong>
+(1900 ms vs 4005 ms).</p>
+<p>The mechanism is straightforward. The static partition hands each
+worker a contiguous slice of the options array. Because the input is
+grouped by type, the last worker gets all the expensive Asians and
+Americans while the first workers finish their cheap Europeans and then
+sit at the barrier. The static-partition speedup at T=2 (1.05×) makes
+this very visible — one worker is doing almost all the work.</p>
+<p>Work-stealing pays a small overhead even when there’s nothing to do
+(idle workers spin through random victims and yield the scheduler), but
+the cluster numbers show this cost is small enough that work-stealing
+also wins on the balanced portfolio at every thread count tested. The
+Chase-Lev deque’s owner-side operations are wait-free, so the common
+case (a worker has its own work) is just a pair of atomic operations on
+<code>top</code> and <code>bottom</code>, not a lock or a system call.
+Combined with the lack of a global barrier (workers exit when an atomic
+<code>remaining</code> counter hits zero rather than waiting on
+<code>sync.Cond.Broadcast</code>), the steal runner avoids the small but
+measurable wake-up overhead that the map-reduce runner pays each
+run.</p>
+<h2 id="what-limited-speedup">8. What limited speedup?</h2>
+<ul>
+<li><strong>Load imbalance</strong> on the static-partition runner. The
+biggest limiter on the unbalanced dataset, and the reason work-stealing
+wins so clearly.</li>
+<li><strong>Number of heavy options.</strong> On the unbalanced
+portfolio there are 60 medium/heavy options. At T=12, spreading them
+across workers still works because 60/12 = 5 per worker; a portfolio
+with only a handful of very heavy options would limit even
+work-stealing’s speedup to about
+<code>(number of heavy options) / (number of threads)</code>.</li>
+<li><strong>Memory allocation in the American pricer.</strong> Each call
+allocates a path buffer (~8 MB for P=20,000, N=50). At T=12 the runtime
+allocates several of these per second, which the Go GC can plausibly
+amplify into wall-clock cost — this is suggested rather than measured
+here. A pooled buffer (<code>sync.Pool</code>) is the obvious next step;
+left out so the seq / par / steal comparison stays
+apples-to-apples.</li>
+<li><strong>Timer noise on very short runs.</strong> The balanced
+portfolio finishes in 25–40 ms at T≥8 on the cluster — small enough that
+scheduling jitter shows up. Averaging five seeds (the numbers in §5)
+cuts the per-cell variance to a few percent, but absolute speedup at T=8
+on the balanced workload is still bounded more by overhead than by
+parallelism on this run.</li>
+<li><strong>SMT vs physical cores.</strong> The peanut-cpu node exposes
+32 logical CPUs from 16 physical EPYC cores (2-way SMT). Going from T=8
+to T=12 on the unbalanced workload still gains speedup (7.48× → 9.69×
+for work-stealing), but the per-thread marginal return drops once T
+pushes past the physical-core boundary.</li>
+</ul>
+<p>I didn’t find any synchronization-overhead bottleneck: the deque
+operations and the barrier together account for well under 1% of total
+runtime.</p>
+<h2 id="comparison-map-reduce-vs-work-stealing">9. Comparison:
+map-reduce vs work-stealing</h2>
+<table>
+<colgroup>
+<col style="width: 28%" />
+<col style="width: 35%" />
+<col style="width: 36%" />
+</colgroup>
+<thead>
+<tr>
+<th>Property</th>
+<th>Map-reduce (static)</th>
+<th>Work-stealing</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sync primitive</td>
+<td>sync.Cond barrier</td>
+<td>Lock-free deque + atomic counter</td>
+</tr>
+<tr>
+<td>Load balancing</td>
+<td>None (relies on input layout)</td>
+<td>Automatic</td>
+</tr>
+<tr>
+<td>Overhead when balanced</td>
+<td>Small barrier wake-up cost</td>
+<td>Lower (no global barrier)</td>
+</tr>
+<tr>
+<td>Overhead when unbalanced</td>
+<td>Large (T=2: 1.00× speedup)</td>
+<td>Small (T=2: 2.11×)</td>
+</tr>
+<tr>
+<td>Code complexity</td>
+<td>Trivial</td>
+<td>Moderate (deque correctness)</td>
+</tr>
+<tr>
+<td>Determinism (with seed)</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<p>The two implementations agree on portfolio totals to the last decimal
+— the difference is purely in <em>how</em> the work is scheduled. For
+this workload (per-item costs that vary by ~100×), work-stealing clearly
+wins on the unbalanced input and ties on the balanced one.</p>
+<h2 id="future-work">10. Future work</h2>
+<ul>
+<li><strong>Per-path-chunk task subdivision</strong> — split each option
+into K chunks of paths so that workers can steal chunks rather than
+whole options. Would help portfolios with only a few very expensive
+options.</li>
+<li><strong>Pooled path buffers</strong> in the American pricer — use
+<code>sync.Pool</code> to reduce GC pressure under high T.</li>
+<li><strong>Variance reduction</strong> (antithetic / control variates)
+— cuts the number of paths needed for a given accuracy. Out of scope
+here because it would change the per-option cost and muddy the timing
+comparison.</li>
+</ul>
+</body>
+</html>
