@@ -1,11 +1,10 @@
-// Package deque implements a Chase-Lev lock-free work-stealing deque,
+// Package deque implements an array-based lock-free work-stealing deque,
 // the data structure required by the project brief for the work-stealing
 // runner.
 //
-// Algorithm: Chase & Lev, "Dynamic Circular Work-Stealing Deque" (SPAA
-// 2005). The owner pushes and pops from the bottom (LIFO); thieves
-// steal from the top (FIFO). All synchronisation is done with atomics
-// only - no mutexes - which is what the assignment requires.
+// The owner pushes and pops from the bottom (LIFO); thieves steal from
+// the top (FIFO). All synchronisation is done with atomics only - no
+// mutexes - which is what the assignment requires.
 //
 // The deque uses a fixed-power-of-two backing array. Callers size it to
 // accommodate the largest initial workload; growth is not implemented

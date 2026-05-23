@@ -95,7 +95,7 @@ Europeans in milliseconds and wait at the barrier.
 
 ### 2.4 Work-stealing (`runner/steal.go` + `deque/deque.go`)
 
-Each of the `T` worker goroutines owns its own **Chase-Lev lock-free
+Each of the `T` worker goroutines owns its own **array-based lock-free
 deque**. Tasks are distributed round-robin at startup so that heavy
 options are spread across all deques rather than all landing on the
 last one. Each worker loops:
@@ -138,7 +138,7 @@ paper, rather than reaching for a library. Both questions ended up
 answered (yes, and "more than I expected") and shape the discussion
 below.
 
-**Chase-Lev correctness.** Getting the one-element edge case right
+**Deque correctness.** Getting the one-element edge case right
 took some thought. When the deque holds exactly one task, the owner's
 `PopBottom` and a thief's `Steal` both target the same slot; the
 algorithm settles the race with a `CompareAndSwap` on `top`. Go's
@@ -343,7 +343,7 @@ A few small optimizations matter for this workload:
   - **American pricer:** the per-timestep discount factors are
     precomputed once into a small array, replacing the inner-loop
     `math.Pow` calls with array lookups.
-  - **Chase-Lev deque cache padding:** the `top` and `bottom` atomics
+  - **Deque cache padding:** the `top` and `bottom` atomics
     sit on separate 64-byte cache lines (`deque/deque.go`). Without
     that padding the two atomics share a line, and every `Steal()`
     invalidates the line on the owner's core. An A/B comparison on
@@ -369,7 +369,7 @@ Work-stealing pays a small overhead even when there's nothing to do
 (idle workers spin through random victims and yield the scheduler),
 but the cluster numbers show this cost is small enough that
 work-stealing also wins on the balanced portfolio at every thread
-count tested. The Chase-Lev deque's owner-side operations are
+count tested. The deque's owner-side operations are
 wait-free, so the common case (a worker has its own work) is just a
 pair of atomic operations on `top` and `bottom`, not a lock or a
 system call. Combined with the lack of a global barrier (workers exit
@@ -439,3 +439,27 @@ clearly wins on the unbalanced input and ties on the balanced one.
     the number of paths needed for a given accuracy. Out of scope
     here because it would change the per-option cost and muddy the
     timing comparison.
+
+## 11. Acknowledgments
+
+The Monte Carlo pricing algorithms in `option/` (European Black-Scholes
+sampling, the Asian arithmetic-average path pricer, and the American
+Longstaff-Schwartz least-squares pricer) follow standard textbook
+formulations, and I consulted external references and example code
+while writing them. The assignment permits this: the brief states that
+"all the parallel work is required to be implemented by you," and the
+pricers are the per-task sequential workload, not the parallel
+infrastructure.
+
+Everything else is my own work. The parallel code:
+
+  - the array-based lock-free work-stealing deque (`deque/`),
+  - the reusable `sync.Cond` barrier (`barrier/`),
+  - all three runners — sequential, map-reduce, and work-stealing
+    (`runner/`).
+
+And the supporting code around it:
+
+  - the CLI and dataset generator (`main.go`, `portfolio/`),
+  - the benchmarking shell scripts and plotting code (`scripts/`,
+    `benchmark/`).

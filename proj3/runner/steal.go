@@ -9,7 +9,7 @@ import (
 	"proj3/deque"
 )
 
-// RunWorkStealing executes pricing tasks on per-worker Chase-Lev deques.
+// RunWorkStealing executes pricing tasks on per-worker array-based lock-free deques.
 //
 // Init:   Tasks are distributed round-robin across the T deques so the
 //

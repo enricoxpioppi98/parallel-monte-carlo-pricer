@@ -5,7 +5,7 @@ Three runners that price the same portfolio of exotic options
 
   - **`seq`**    - single-goroutine baseline
   - **`par`**    - static-partition map-reduce with a `sync.Cond` barrier
-  - **`steal`**  - work-stealing across per-worker Chase-Lev lock-free deques
+  - **`steal`**  - work-stealing across per-worker array-based lock-free deques
 
 See `REPORT.md` for the full write-up.
 
@@ -106,7 +106,7 @@ proj3/
   option/              GBM, RNG, European/Asian/American pricers (+ tests)
   portfolio/           JSON load/save, dataset generator
   barrier/             Reusable sync.Cond barrier
-  deque/               Chase-Lev lock-free deque (+ -race stress test)
+  deque/               Array-based lock-free deque (+ -race stress test)
   runner/              sequential, map-reduce, work-stealing
   scripts/             run.sh, experiments.sh, cluster_experiments.sh, plot.py
   benchmark/           Sbatch script + Slurm log directory (peanut-cpu)
